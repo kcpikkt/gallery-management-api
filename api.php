@@ -2,11 +2,11 @@
     session_start();
     $base = "contents/";
     $filetypes = array(".html");
-    $upload_no_overwrite = false;
+    $upload_no_overwrite = false; 
     $rename_no_overwrite = false;
-//
+
     $input = file_get_contents("php://input");
-    if($_SERVER['REQUEST_METHOD'] == 'GET'){
+    if($_SERVER['REQUEST_METHOD'] == 'GET'){        // GET FILES LIST
         class RecursiveFilesIterator extends RecursiveFilterIterator{
             public static $FILTERS = array('/.');
             public function accept(){
@@ -24,7 +24,7 @@
         foreach($files as $filename => $file){array_push($filelist, $filename);}
         echo json_encode($filelist);
     }
-    if($_SERVER['REQUEST_METHOD'] == 'POST'){
+    if($_SERVER['REQUEST_METHOD'] == 'POST'){       // UPLOAD
         $path = $_POST['path'];
         if(!$path){
             echo_err(5,"no path parameter."); exit;
@@ -43,32 +43,37 @@
             else { echo_err(4, "$filename saving error.");}
         }
     }
-    if($_SERVER['REQUEST_METHOD'] == 'DELETE'){
+    if($_SERVER['REQUEST_METHOD'] == 'DELETE'){     // DELETE 
         $path = $input;
         if(!file_exists($path)){
             echo_err(1, "$path does not exist.");
+        }else if(substr($path, 0, strlen($base)) !== $base){
+            echo_err(2, "invalid path, only files under $base can be edited.");
         }else{
             $ret = unlink($path);
             if($ret){ echo_err(0, "$path deleted.");}
-            else{ echo_err(2, "deleting $path failed");}
+            else{ echo_err(3, "deleting $path failed");}
         }
     }
-    if($_SERVER['REQUEST_METHOD'] == 'PUT'){ 
+    if($_SERVER['REQUEST_METHOD'] == 'PUT'){        // RENAME
         $params = json_decode($input, true);
         $name = $params["name"];
         $original = $params["path"];
         if(!file_exists($original)){
             echo_err(1, "$original does not exist.");
+        }else if(substr($original, 0, strlen($base)) !== $base){
+            echo_err(2, "invalid path, only files under $base can be edited.");
         }else{
-            if(rename($path, $name)){ echo_err(0, "$original renamed to $name.");}
-            else{ echo_err(2, "renaming $original to $name failed");}
+            if(rename($original, $name)){ echo_err(0, "$original renamed to $name.");}
+            else{ echo_err(3, "renaming $original to $name failed");}
         }
 
     }
 
     function echo_err($code, $msg){ echo json_encode(array( "error" => $code, "err_msg" => $msg)); }
 
-/*
+// code for acquireing recursive json directory tree, don't delete, i bet it is going to be needed
+/* 
     function add_entry_at(&$arr, $at, $index, $path ,$depth = 0){
         global $filetypes;
         if($depth >= sizeof($at)){return;}
