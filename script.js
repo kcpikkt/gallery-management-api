@@ -1,18 +1,3 @@
-window.onload = function() {
-    document.getElementById("testbutton").onclick = 
-        function(){ return function(e){
-            gm_api.rename_files(["contents/rec.gif"], "dupsko");
-        } }();
-    gm_api.log_output_element = document.getElementById("logger");
-    gm_api.file_select_preview_element = document.getElementById("preview");
-    //document.getElementById("fileselect")
-        //.addEventListener('change', gm_api.handle_file_select, false);
-    //document.getElementById("uploadbutton").onclick 
-        //= function(){ return gm_api.upload_selected_files("contents/");}
-    gm_api.init();
-}
-
-
 // gallery management api
 
 /*
