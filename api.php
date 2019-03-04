@@ -59,12 +59,14 @@
         $params = json_decode($input, true);
         $name = $params["name"];
         $original = $params["path"];
+        $pathinfo = pathinfo($original);
+        $newname = $name . "." . $pathinfo['extension'];
         if(!file_exists($original)){
             echo_err(1, "$original does not exist.");
         }else if(substr($original, 0, strlen($base)) !== $base){
             echo_err(2, "invalid path, only files under $base can be edited.");
         }else{
-            if(rename($original, $name)){ echo_err(0, "$original renamed to $name.");}
+            if(rename($original, $newname)){ echo_err(0, "$original renamed to $newname.");}
             else{ echo_err(3, "renaming $original to $name failed");}
         }
 
