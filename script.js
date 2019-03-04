@@ -1,59 +1,137 @@
-
-// CMS API 
-//
-// 1.Overview
-//     every method of this api lives in 'API' namespace so you call them like that:
-//     API.some_method();
-//     so you can define your own 'some_method()' and there is no collision.
-//
-// 2.Methods
-//   init ()
-//      should be called at the before first usage of the API,
-//   returns 1 if everything went well or undefined if failed.
-//
-//   get_file_list ()
-//   returns list of paths to all files under $base directory recursively
-//           ($base is defined in api.php) or undefined if failed.
-//
-//   delete_files ( arr )
-//      takes JSON array of filepaths 'arr' and deletes them from the server
-//   returns  
-//...
 window.onload = function() {
     document.getElementById("testbutton").onclick = 
         function(){ return function(e){
-            API.rename_files(["contents/sell.sc", "contents/main.cpp"], "dupsko");
+            gm_api.rename_files(["contents/rec.gif"], "dupsko");
         } }();
-    API.log_output_element = document.getElementById("logger");
-    API.file_select_preview_element = document.getElementById("preview");
-    document.getElementById("fileselect")
-        .addEventListener('change', API.handle_file_select, false);
-    document.getElementById("uploadbutton").onclick 
-        = function(){ return API.upload_selected_files("contents/");}
-    API.init();
+    gm_api.log_output_element = document.getElementById("logger");
+    gm_api.file_select_preview_element = document.getElementById("preview");
+    //document.getElementById("fileselect")
+        //.addEventListener('change', gm_api.handle_file_select, false);
+    //document.getElementById("uploadbutton").onclick 
+        //= function(){ return gm_api.upload_selected_files("contents/");}
+    gm_api.init();
 }
 
-var API = {
-    apiurl : "api.php",
 
-    file_select_quick_upload            : false         ,
-    file_select_quick_upload_directory  : "contents/"   ,
-    file_select_no_stack_up             : false         ,
-    file_select_preview                 : true          ,
-    file_select_preview_element         : undefined     ,  
-    file_select_preview_css_class       : "thumb"       ,
-    file_upload_fail_fast               : false         ,
-    file_upload_persist_failed          : false         ,
-    file_delete_fail_fast               : false         ,
-    file_rename_fail_fast               : false         ,
-    file_rename_index_prefix            : ""            ,
-    file_rename_index_postfix           : ""            ,
-    file_rename_one_no_index            : true          ,
-    log_buffer_size                     : 15            ,
-    log_buffer_endline                  : "<br>"        ,
-    log_output_element                  : undefined     ,
-    log_console_output                  : true          ,
-    log_element_output                  : true          ,
+// gallery management api
+
+/*
+==================================================================================================================================
+ 1.Overview
+     every method of this api lives in 'gm_api' namespace so you call them like that:
+     gm_api.some_method();
+     so you can define your own 'some_method()' and there is no collision.
+
+==================================================================================================================================
+ 2.Methods
+   NOTE: every parameter of every method is mandatory.
+   NOTE: behaviour of some methods change depending on global variables,
+         make sure to set them before you use the api.
+
+--------------------------------------------------------------------------------------------------------------------------------
+   init ()
+      Should be called at the start, before using this gm_api,
+      i.e. you should first set global variables, connect DOM elements and such
+      and then call gm_api.init() once. Force all of its log output onto the console.
+
+      returns 1 if everything went well or undefined if failed.
+
+--------------------------------------------------------------------------------------------------------------------------------
+   get_file_tree ()
+      NOT IMPLEMENTED 
+
+--------------------------------------------------------------------------------------------------------------------------------
+   get_file_list ()
+      returns list of paths to all files under $base directory recursively
+              as JSON array or undefined if failed ($base is defined in api.php).
+
+--------------------------------------------------------------------------------------------------------------------------------
+   delete_files ( arr )
+      takes JSON array of paths to files - 'arr' and deletes them from the server.
+
+      returns  
+
+--------------------------------------------------------------------------------------------------------------------------------
+   rename_files ( arr , name )
+      takes JSON array of paths to files - 'arr' and renames them to 'name'+'index'
+      where 'index' is exactly the same as index of a given filepath in 'arr'.
+      file_rename_index_prefix and file_rename_index_postfix can be specified to
+      have files named in form of e.g. 'name'_('index').
+
+      returns number of files successfully renamed or undefined if failed.
+
+--------------------------------------------------------------------------------------------------------------------------------
+   handle_file_select ( e )
+      Takes event 'e' and adds e.target.files to the file_select_buffer.
+      Should be used with DOM file browser element like in example below.
+
+      returns nothing.
+
+      example usage:
+          <div type="file" id="fileselect" accept="image/*" multiple/>
+          <script>
+              document.getElementById( "fileselect" )
+                  .addEventListener( "onchange" , gm_api.handle_file_select , false )
+          </script>
+
+--------------------------------------------------------------------------------------------------------------------------------
+  clear_file_select_buffer ()
+      simply clears selected files buffer.
+
+      returns nothing.
+
+--------------------------------------------------------------------------------------------------------------------------------
+  TODO: this method may need to execute asynchronously for large files, add async support.
+  upload_selected_files ( path ) 
+      uploads files stored currenly in file_select_buffer to the server 
+      at location specified in 'path'. If a given file is uploaded successfully its automatically
+      deleted from file_select buffer
+
+      returns number of files successfully uploaded or undefined if failed.
+
+--------------------------------------------------------------------------------------------------------------------------------
+*/
+
+var gm_api = {
+/*
+==================================================================================================================================
+  3.Variables
+  NOTE: Its bad practice to change them directly in code. Instead do
+        gm_api.variable_name = value;
+
+*/
+    apiurl : "api.php",                                     // url to corresponding backend side of this api
+//------------------------------------------------------------------------------------------------------------------------------
+    file_select_quick_upload            : false         ,   // If true, uploads files right after handling selection.
+    file_select_quick_upload_directory  : "contents/"   ,   // Directory for quick upload.
+    file_select_no_stack_up             : false         ,   // If true, file_select_buffer is cleared before every new selection.
+    file_select_preview                 : false         ,   // If true, selected files thumbnails are handled.
+    file_select_preview_element         : undefined     ,   // DOM element in which thumbnails ought to be shown.
+    file_select_preview_css_class       : "thumb"       ,   // CSS class given by default to every thumbnail.
+
+//------------------------------------------------------------------------------------------------------------------------------
+    file_upload_fail_fast               : false         ,   // Stop uploading files immediately after one fails.
+    file_upload_persist_failed          : true          ,   // Keep files that failed to upload in file_select_buffer
+
+//------------------------------------------------------------------------------------------------------------------------------
+    file_delete_fail_fast               : false         ,   // Stop deleting files immediately after one fails.
+
+//------------------------------------------------------------------------------------------------------------------------------
+    file_rename_fail_fast               : false         ,   // Stop renaming files immediately after one fails.
+    file_rename_index_prefix            : ""            ,   // Put before index when renaming files.
+    file_rename_index_postfix           : ""            ,   // Put after index when renaming files.
+    file_rename_one_no_index            : true          ,   // If true, Omit index when renaming only one file.
+
+//------------------------------------------------------------------------------------------------------------------------------
+    log_console_output                  : true          ,   // If true, outputs all logs to the browser console
+    log_element_output                  : true          ,   // If true, outputs all logs to the specified DOM element
+    log_output_element                  : undefined     ,   // DOM element in which logs ought to be shown.
+    log_buffer_size                     : 15            ,   // Log buffer size in lines.
+    log_buffer_endline                  : "<br>"        ,   // Put after every log shown in DOM
+
+//------------------------------------------------------------------------------------------------------------------------------
+//========================================================================================== max 130 characters wide =============
+
 
     log_buffer : undefined,
     log_buffer_iter : 0,
@@ -63,106 +141,106 @@ var API = {
         var ret = 1;
         var logprefix = "init: ";
         if(!(window.File && window.FileReader && window.FileList && window.Blob)){
-            API.err(logprefix+"File APIs are not fully supported in this browser."); ret = undefined;}
-        API.log_buffer = new Array(API.log_buffer_size);
-        if(API.log_buffer === undefined || API.log_buffer.length !== API.log_buffer_size){
-            API.err(logprefix+"Failed to create log_buffer.", true); ret = undefined;}
-        if(!(API.log_output_element instanceof Element) && API.log_element_output){
-            API.err(logprefix+"log_output_element is not an instance of Element.", true); ret = undefined;}
-        if(!(API.file_select_preview_element instanceof Element) && API.file_select_preview){
-            API.err(logprefix+"file_preview_element is not an instance of Element.", true); ret = undefined;}
+            gm_api.err(logprefix+"File gm_apis are not fully supported in this browser."); ret = undefined;}
+        gm_api.log_buffer = new Array(gm_api.log_buffer_size);
+        if(gm_api.log_buffer === undefined || gm_api.log_buffer.length !== gm_api.log_buffer_size){
+            gm_api.err(logprefix+"Failed to create log_buffer.", true); ret = undefined;}
+        if(!(gm_api.log_output_element instanceof Element) && gm_api.log_element_output){
+            gm_api.err(logprefix+"log_output_element is not an instance of Element.", true); ret = undefined;}
+        if(!(gm_api.file_select_preview_element instanceof Element) && gm_api.file_select_preview){
+            gm_api.err(logprefix+"file_preview_element is not an instance of Element.", true); ret = undefined;}
         return ret;
     },
     clear_file_select_buffer : function(){
         file_select_buffer = new Array();
     },
     handle_file_select : function(e){
-        if(API.file_select_no_stack_up){API.clear_file_select_buffer();}
-        API.file_select_buffer.push.apply(API.file_select_buffer, e.target.files);
-        if(API.file_select_preview){ API.update_file_select_preview();}
-        if(API.file_select_quick_upload){API.upload_selected_files(API.file_select_quick_upload_directory);}
+        if(gm_api.file_select_no_stack_up){gm_api.clear_file_select_buffer();}
+        gm_api.file_select_buffer.push.apply(gm_api.file_select_buffer, e.target.files);
+        if(gm_api.file_select_preview){ gm_api.update_file_select_preview();}
+        if(gm_api.file_select_quick_upload){gm_api.upload_selected_files(gm_api.file_select_quick_upload_directory);}
     },
     update_file_select_preview(){
-        if(API.file_select_preview_element instanceof Element){
-            API.file_select_preview_element.innerHTML = "";
-            for(let i=0, f; f=API.file_select_buffer[i]; i++){
+        if(gm_api.file_select_preview_element instanceof Element){
+            gm_api.file_select_preview_element.innerHTML = "";
+            for(let i=0, f; f=gm_api.file_select_buffer[i]; i++){
                 if(!f.type.match('image.*')){ continue; }
                 var reader = new FileReader();
                 reader.onload = (function(file){
                     return function(e){
                         var span = document.createElement('span');
-                        span.innerHTML = ['<img class="',API.file_select_preview_css_class,
+                        span.innerHTML = ['<img class="',gm_api.file_select_preview_css_class,
                             '" src="', e.target.result, '"title="', escape(file.name), '"/>,'].join('');
-                        API.file_select_preview_element.insertBefore(span, null);
+                        gm_api.file_select_preview_element.insertBefore(span, null);
                     }
                 })(f);
                 reader.readAsDataURL(f);
             }
         }else{
-            API.err("file_preview_element is not an instance of Element.");
+            gm_api.err("file_preview_element is not an instance of Element.");
         }
     },
     get_file_list: function(){ 
-        return API._request('GET',API.apiurl,null, true, "get_file_list failed"); 
+        return gm_api._request('GET',gm_api.apiurl,null, true, "get_file_list failed"); 
     },
     upload_selected_files(path){ // TODO: async
         var logprefix = "upload_selected_files(path): ";
         var omitted = 0;
-        var total = API.file_select_buffer.length;
-        if(path === undefined){ API.err(logprefix+"path is not specified."); return undefined; } 
-        while(API.file_select_buffer.length > omitted){
+        var total = gm_api.file_select_buffer.length;
+        if(path === undefined){ gm_api.err(logprefix+"path is not specified."); return undefined; } 
+        while(gm_api.file_select_buffer.length > omitted){
             var form_data = new FormData();
-            form_data.append('file', API.file_select_buffer[omitted]);
+            form_data.append('file', gm_api.file_select_buffer[omitted]);
             form_data.append('path', path);
-            var ret = API._request
-                ('POST',API.apiurl,form_data, true,
-                    logprefix + "uploading " + API.file_select_buffer[omitted].name + " failed"); 
+            var ret = gm_api._request
+                ('POST',gm_api.apiurl,form_data, true,
+                    logprefix + "uploading " + gm_api.file_select_buffer[omitted].name + " failed"); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ API.err( logprefix + "uploading "+ API.file_select_buffer[omitted].name +" failed"); }
-            else if(ret.error != 0){ API.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ API.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(ret === undefined){ gm_api.err( logprefix + "uploading "+ gm_api.file_select_buffer[omitted].name +" failed"); }
+            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
 
-            if(API.file_upload_fail_fast && failed){return undefined;}
-            if(API.file_upload_persist_failed && failed){ omitted+=1; continue;}
-            API.file_select_buffer.splice(omitted, 1);
-            if(API.file_select_preview){ API.update_file_select_preview();}
+            if(gm_api.file_upload_fail_fast && failed){return undefined;}
+            if(gm_api.file_upload_persist_failed && failed){ omitted+=1; continue;}
+            gm_api.file_select_buffer.splice(omitted, 1);
+            if(gm_api.file_select_preview){ gm_api.update_file_select_preview();}
         }
-        API.log(logprefix+"uploaded " + (total-omitted) + " of " + total)
+        gm_api.log(logprefix+"uploaded " + (total-omitted) + " of " + total)
         return (total - omitted);
     },
     delete_files : function(arr){ 
         var logprefix = "delete_files(arr): ";
-        if(!Array.isArray(arr)){ API.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
         while(iter < total){
-            var ret = API._request('DELETE',API.apiurl,arr[iter], true, logprefix + "failed"); 
+            var ret = gm_api._request('DELETE',gm_api.apiurl,arr[iter], true, logprefix + "failed"); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ API.err( logprefix + "deleting "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ API.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ API.log(logprefix + "SERVER: "+ ret.err_msg); }
-            if(API.file_delete_fail_fast && failed){return undefined;}
+            if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(gm_api.file_delete_fail_fast && failed){return undefined;}
             iter++;
         }
         return (total - omitted);
     },
     rename_files : function(arr, name){
         var logprefix = "rename_files(arr,name): ";
-        if(!Array.isArray(arr)){ API.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
         while(iter < total){
-            var params = {"name":name + API.file_rename_index_prefix + 
-                iter + API.file_rename_index_postfix, "path":arr[iter] }
-            if(arr.length == 1 && file_rename_one_no_index){params.name = name;}
-            var ret = API._request('PUT',API.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var params = {"name":name + gm_api.file_rename_index_prefix + 
+                iter + gm_api.file_rename_index_postfix, "path":arr[iter] }
+            if(arr.length == 1 && gm_api.file_rename_one_no_index){params.name = name;}
+            var ret = gm_api._request('PUT',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ API.err( logprefix + "renaming "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ API.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ API.log(logprefix + "SERVER: "+ ret.err_msg); }
-            if(API.file_rename_fail_fast && failed){return undefined;}
+            if(ret === undefined){ gm_api.err( logprefix + "renaming "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(gm_api.file_rename_fail_fast && failed){return undefined;}
             iter++;
         }
         return (total - omitted);
@@ -180,32 +258,31 @@ var API = {
             }
         }
         xhr.send(params);
-        if(ret === undefined){ API.err(err_message); return undefined;}
+        if(ret === undefined){ gm_api.err(err_message); return undefined;}
         else{ return (json_output) ? JSON.parse(ret) : ret; }
     },
     log_output : function(){
         var logprefix = "log_output: ";
-        if(API.log_output_element instanceof Element){
-            API.log_output_element.innerHTML = "";
-            for(    let i=API.log_buffer_iter;
-                    i != Math.abs((API.log_buffer_iter-1)%API.log_buffer_size) ;
-                    i=(i+1)%API.log_buffer_size){
-                if(API.log_buffer[i] != undefined){
-                    API.log_output_element.innerHTML += API.log_buffer[i];
+        if(gm_api.log_output_element instanceof Element){
+            gm_api.log_output_element.innerHTML = "";
+            for(    let i=gm_api.log_buffer_iter;
+                    i != Math.abs((gm_api.log_buffer_iter-1)%gm_api.log_buffer_size) ;
+                    i=(i+1)%gm_api.log_buffer_size){
+                if(gm_api.log_buffer[i] != undefined){
+                    gm_api.log_output_element.innerHTML += gm_api.log_buffer[i];
                 }
             }
         }else{ 
-            API.err(logprefix + "log_output_element is not an instance of Element.", true);
-            API.log()
+            gm_api.err(logprefix + "log_output_element is not an instance of Element.", true);
+            gm_api.log()
         }
     },
     log : function(info, force_console = false){
         var msg = "[" + new Date().toLocaleString() + "] " + info;
-        API.log_buffer[API.log_buffer_iter++] = msg + API.log_buffer_endline;
-        API.log_buffer_iter %= API.log_buffer_size;
-        //TODO:move to log_output
-        if(force_console || API.log_console_output){ console.log(msg); }
-        if(!force_console && API.log_element_output){ API.log_output();}
+        gm_api.log_buffer[gm_api.log_buffer_iter++] = msg + gm_api.log_buffer_endline;
+        gm_api.log_buffer_iter %= gm_api.log_buffer_size;
+        if(force_console || gm_api.log_console_output){ console.log(msg); }
+        if(!force_console && gm_api.log_element_output){ gm_api.log_output();}
     },
-    err : function(info, force_console = false){ API.log(info, force_console);}
+    err : function(info, force_console = false){ gm_api.log(info, force_console);}
 }
