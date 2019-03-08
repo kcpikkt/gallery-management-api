@@ -23,7 +23,10 @@
 
 --------------------------------------------------------------------------------------------------------------------------------
    get_file_tree ()
-      NOT IMPLEMENTED 
+      returns tree of all files under $base directory as JSON array.
+              File is represented by simple JSON object with name and array of its children:
+              { "name":"filename" , "children":[...] }
+              Tree starts with an array containing root object which represents $base directory on the server.
 
 --------------------------------------------------------------------------------------------------------------------------------
    get_file_list ()
@@ -165,8 +168,12 @@ var gm_api = {
             gm_api.err("file_preview_element is not an instance of Element.");
         }
     },
-    get_file_list: function(){ 
-        return gm_api._request('GET',gm_api.apiurl,null, true, "get_file_list failed"); 
+    get_file_list : function(){ 
+        return gm_api._request('GET',gm_api.apiurl, null, true, "get_file_list failed"); 
+    },
+    get_file_tree : function(){
+        var params = 'type=tree';
+        return gm_api._request('GET',gm_api.apiurl, params,true, "get_file_tree failed"); 
     },
     upload_selected_files(path){ // TODO: async
         var logprefix = "upload_selected_files(path): ";
@@ -233,6 +240,7 @@ var gm_api = {
     _request : function
         (method, url, params, json_output=false, err_message="request error"){
         var ret;
+        if(method === 'GET'){ url += "?" + params;}
         var xhr = new XMLHttpRequest();
         xhr.open(method, url, false);
         xhr.onreadystatechange = function() {

@@ -1,7 +1,7 @@
 <?php
     session_start();
     $base = "contents/";
-    $filetypes = array(".html");
+    $filetypes = array(".html", ".png");
     $upload_no_overwrite = false; 
     $rename_no_overwrite = false;
 
@@ -16,14 +16,53 @@
                 return true;
             }
         }
-        $dir = new RecursiveDirectoryIterator($base);
-        $files = new RecursiveIteratorIterator(
-            new RecursiveFilesIterator($dir),
-            RecursiveIteratorIterator::SELF_FIRST);
-        $filelist = array();
-        foreach($files as $filename => $file){array_push($filelist, $filename);}
-        echo json_encode($filelist);
+        if($_GET["type"] === "tree"){
+            function add_entry_at(&$arr, $at, $index,$path,$depth = 0){
+                global $filetypes;
+                if($depth >= sizeof($at)){return;}
+                foreach($arr as &$entry){
+                    if($entry['name'] == $at[$index]){
+                        add_entry_at($entry['children'],$at, $index+1,$path, $depth+1);
+                        return;
+                    }
+                }
+                $timestamp = filemtime($path);
+                $name = $at[$index];
+                $newentry = array('name' => $name, 'children' => array());
+                add_entry_at($newentry['children'], $at, $index+1,$path, $depth+1);
+                array_push($arr, $newentry);
+                return;
+            }
+            function sort_entries_rec_cmp($a, $b){return $b['timestamp'] - $a['timestamp'];}
+            function sort_entries_rec(&$arr){
+                usort($arr, "sort_entries_rec_cmp");
+                foreach($arr as $element){ sort_entries_rec($element['children']); }
+            }
+            $max_depth = 0;
+            $dir = new RecursiveDirectoryIterator($base);
+            $files = new RecursiveIteratorIterator(
+                new RecursiveFilesIterator($dir),
+                RecursiveIteratorIterator::SELF_FIRST);
+            $list = array();
+            $filetree = array(array("name"=>"root","children"=>array()));
+            foreach($files as $path => $file){
+                $del_files = array_filter(
+                    explode(DIRECTORY_SEPARATOR, substr($path, strlen($base))),'strlen');
+                $max_depth = max($max_depth, sizeof($del_files));
+                add_entry_at($filetree[0]['children'], $del_files, 0,$path, 0);
+            }
+            echo json_encode($filetree);
+        }else{
+            $dir = new RecursiveDirectoryIterator($base);
+            $files = new RecursiveIteratorIterator(
+                new RecursiveFilesIterator($dir),
+                RecursiveIteratorIterator::SELF_FIRST);
+            $filelist = array();
+            foreach($files as $filename => $file){array_push($filelist, $filename);}
+            echo json_encode($filelist);
+        }
     }
+
     if($_SERVER['REQUEST_METHOD'] == 'POST'){       // UPLOAD
         $path = $_POST['path'];
         if(!$path){
