@@ -189,16 +189,16 @@ var gm_api = {
             var ret = gm_api._request
                 ('POST',gm_api.apiurl,form_data, true,
                     logprefix + "uploading " + gm_api.file_select_buffer[omitted].name + " failed"); 
-            var failed = (ret === undefined || ret != 0);
+            var failed = (ret === undefined || ret.error != 0);
             var repeat = false;
             if(ret === undefined){ gm_api.err( logprefix + "uploading "+ gm_api.file_select_buffer[omitted].name +" failed"); }
             else if(ret.error != 0){ 
                 if(ret.error == 3){
                     var file = gm_api.file_select_buffer[omitted];
                     var name = (file.newname === undefined ? file.name : file.newname);
-                    console.log(name);
                     var ext = name.substring(name.lastIndexOf("."));
                     var name = name.slice(0, -(ext.length));
+            console.log(name);
                     var regex = new RegExp
                         ( gm_api.file_rename_index_prefix + "[0-9]+" + gm_api.file_rename_index_postfix, "gm")
                     index = name.match(regex);
@@ -222,7 +222,6 @@ var gm_api = {
                     gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
                 }
             else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
-
             if(gm_api.file_upload_fail_fast && failed){return undefined;}
             if(gm_api.file_upload_persist_failed && failed){ omitted+=1; continue;}
             if(!repeat){ gm_api.file_select_buffer.splice(omitted, 1); }
