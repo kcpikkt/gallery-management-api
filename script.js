@@ -106,8 +106,8 @@ var gm_api = {
 
 //------------------------------------------------------------------------------------------------------------------------------
     file_rename_fail_fast               : false         ,   // Stop renaming files immediately after one fails.
-    file_rename_index_prefix            : ""            ,   // Put before index when renaming files.
-    file_rename_index_postfix           : ""            ,   // Put after index when renaming files.
+    file_rename_index_prefix            : "("            ,   // Put before index when renaming files.
+    file_rename_index_postfix           : ")"            ,   // Put after index when renaming files.
     file_rename_one_no_index            : true          ,   // If true, Omit index when renaming only one file.
 
 //------------------------------------------------------------------------------------------------------------------------------
@@ -184,17 +184,48 @@ var gm_api = {
             var form_data = new FormData();
             form_data.append('file', gm_api.file_select_buffer[omitted]);
             form_data.append('path', path);
+            form_data.append('newname', gm_api.file_select_buffer[omitted].newname);
+            form_data.append('newname', gm_api.file_select_buffer[omitted].newname);
             var ret = gm_api._request
                 ('POST',gm_api.apiurl,form_data, true,
                     logprefix + "uploading " + gm_api.file_select_buffer[omitted].name + " failed"); 
             var failed = (ret === undefined || ret != 0);
+            var repeat = false;
             if(ret === undefined){ gm_api.err( logprefix + "uploading "+ gm_api.file_select_buffer[omitted].name +" failed"); }
-            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else if(ret.error != 0){ 
+                if(ret.error == 3){
+                    var file = gm_api.file_select_buffer[omitted];
+                    var name = (file.newname === undefined ? file.name : file.newname);
+                    console.log(name);
+                    var ext = name.substring(name.lastIndexOf("."));
+                    var name = name.slice(0, -(ext.length));
+                    var regex = new RegExp
+                        ( gm_api.file_rename_index_prefix + "[0-9]+" + gm_api.file_rename_index_postfix, "gm")
+                    index = name.match(regex);
+                    if(index == null){
+                        name+=
+                            gm_api.file_rename_index_prefix+"0"+gm_api.file_rename_index_postfix;
+                    }else{
+                        name = name.slice(0, -(
+                            gm_api.file_rename_index_prefix.length + 
+                            index[0].length +
+                            gm_api.file_rename_index_postfix.length
+                        ));
+                        name+=
+                            gm_api.file_rename_index_prefix+(parseInt(index[0])+1)+gm_api.file_rename_index_postfix;
+                    }
+                    name += ext;
+                    repeat = true;
+                    failed = false;
+                    gm_api.file_select_buffer[omitted].newname = name;
+                }else{
+                    gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+                }
             else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
 
             if(gm_api.file_upload_fail_fast && failed){return undefined;}
             if(gm_api.file_upload_persist_failed && failed){ omitted+=1; continue;}
-            gm_api.file_select_buffer.splice(omitted, 1);
+            if(!repeat){ gm_api.file_select_buffer.splice(omitted, 1); }
             if(gm_api.file_select_preview){ gm_api.update_file_select_preview();}
         }
         gm_api.log(logprefix+"uploaded " + (total-omitted) + " of " + total)

@@ -2,7 +2,7 @@
     session_start();
     $base = "contents/";
     $filetypes = array(".html", ".png");
-    $upload_no_overwrite = false; 
+    $upload_no_overwrite = true; 
     $rename_no_overwrite = false;
 
     $input = file_get_contents("php://input");
@@ -70,14 +70,20 @@
         }
         $DIR_SEP = DIRECTORY_SEPARATOR;
         $filename = $_FILES['file']['name'];
+        $newname = $_POST['newname'];
+        file_put_contents('php://stderr', "$newname\n");
+        if(strcmp($_POST['newname'],"undefined")){
+            $filename = $_POST['newname'];
+        }
+
         if ( 0 < $_FILES['file']['error']){
             echo_err(1,"$filename uploading error.");
-        }else if(!file_exists($path)){
+        }else if(!file_exists($base.$DIR_SEP.$path)){
             echo_err(2 ,"$path does not exist.");
-        }else if($upload_no_overwrite && file_exists($path.$DIR_SEP.$filename)){
+        }else if($upload_no_overwrite && file_exists($base.$DIR_SEP.$path.$DIR_SEP.$filename)){
             echo_err(3, "file ".$path.$DIR_SEP.$filename." exists, overwrite disabled.");
         }else{
-            $ret = move_uploaded_file( $_FILES['file']['tmp_name'],$base.$filename);
+            $ret = move_uploaded_file( $_FILES['file']['tmp_name'],$base.$path.$DIR_SEP.$filename);
             if($ret){ echo_err(0,"$filename successfully uploaded.");}
             else { echo_err(4, "$filename saving error.");}
         }
