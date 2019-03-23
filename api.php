@@ -89,32 +89,68 @@
         }
     }
     if($_SERVER['REQUEST_METHOD'] == 'DELETE'){     // DELETE 
-        $path = $input;
-        if(!file_exists($path)){
-            echo_err(1, "$path does not exist.");
-        }else if(substr($path, 0, strlen($base)) !== $base){
-            echo_err(2, "invalid path, only files under $base can be edited.");
+        $params = json_decode($input, true);
+        $path = $params["path"] . DIRECTORY_SEPARATOR;
+        $type = $params["type"];
+        if($type === "directory"){
+            if(!file_exists($base.$path)){
+                echo_err(1, "$path does not exist.");
+            }else if(!is_dir($base.$path)){
+                echo_err(2, "$path is not a directory");
+            }else{
+                $ret = delete_rec($base.$path);
+                if($ret){ echo_err(0, "$path deleted.");}
+            }
         }else{
-            $ret = unlink($path);
-            if($ret){ echo_err(0, "$path deleted.");}
-            else{ echo_err(3, "deleting $path failed");}
+            if(!file_exists($base.$path)){
+                echo_err(1, "$path does not exist.");
+            }else if(is_dir($base.$path)){
+                echo_err(4, "$path is a directory.");
+            }else{
+                $ret = unlink($base.$path);
+                if($ret){ echo_err(0, "$path deleted.");}
+                else{ echo_err(3, "deleting $path failed");}
+            }
         }
     }
-    if($_SERVER['REQUEST_METHOD'] == 'PUT'){        // RENAME
-        $params = json_decode($input, true);
-        $name = $params["name"];
-        $original = $params["path"];
-        $pathinfo = pathinfo($original);
-        $newname = $name . "." . $pathinfo['extension'];
-        if(!file_exists($original)){
-            echo_err(1, "$original does not exist.");
-        }else if(substr($original, 0, strlen($base)) !== $base){
-            echo_err(2, "invalid path, only files under $base can be edited.");
-        }else{
-            if(rename($original, $newname)){ echo_err(0, "$original renamed to $newname.");}
-            else{ echo_err(3, "renaming $original to $name failed");}
+    function delete_rec($target) {
+        if(is_dir($target)){
+            $files = glob( $target . '*', GLOB_MARK ); 
+            foreach( $files as $file ){
+                delete_rec( $file );}
+            $ret = rmdir( $target );
+            if(!$ret){ echo_err(3, "deleting $target failed"); exit;}
+            return $ret;
+        } elseif(is_file($target)) {
+            $ret = unlink($target);
+            if(!$ret){ echo_err(3, "deleting $target failed"); exit;}
         }
-
+    }
+    if($_SERVER['REQUEST_METHOD'] == 'PUT'){        // RENAME , ADD DIR
+        $params = json_decode($input, true);
+        if($params["type"] == "directory"){
+            $path = $params["path"];
+            if(file_exists($base.$path)){
+                echo_err(1, "$path already exists.");
+            }else{
+                $ret = mkdir($base.$path, 0777, true);
+                if($ret){ echo_err(0, "$path created.");}
+                else{ echo_err(3, "creating $path failed");}
+            }
+        }else{
+            $name = $params["name"];
+            $original = $params["path"];
+            $pathinfo = pathinfo($original);
+            $newname = $name . "." . $pathinfo['extension'];
+            if(!file_exists($original)){
+                echo_err(1, "$original does not exist.");
+            }else if(substr($original, 0, strlen($base)) !== $base){
+                echo_err(2, "invalid path, only files under $base can be edited.");
+            }else{
+                if(rename($original, $newname)){ echo_err(0, "$original renamed to $newname.");}
+                else{ echo_err(3, "renaming $original to $name failed");}
+            }
+        }
     }
 
     function echo_err($code, $msg){ echo json_encode(array( "error" => $code, "err_msg" => $msg)); }

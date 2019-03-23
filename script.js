@@ -40,6 +40,17 @@
       returns  
 
 --------------------------------------------------------------------------------------------------------------------------------
+   delete_directories ( arr )
+      takes JSON array of paths to directories - 'arr' and deletes them and their contents recursively from the server.
+
+      returns  
+
+--------------------------------------------------------------------------------------------------------------------------------
+   create_directories ( arr )
+      takes JSON array of paths and creates specified directories
+
+      returns  
+--------------------------------------------------------------------------------------------------------------------------------
    rename_files ( arr , name )
       takes JSON array of paths to files - 'arr' and renames them to 'name'+'index'
       where 'index' is exactly the same as index of a given filepath in 'arr'.
@@ -106,9 +117,11 @@ var gm_api = {
 
 //------------------------------------------------------------------------------------------------------------------------------
     file_rename_fail_fast               : false         ,   // Stop renaming files immediately after one fails.
-    file_rename_index_prefix            : "("            ,   // Put before index when renaming files.
-    file_rename_index_postfix           : ")"            ,   // Put after index when renaming files.
+    file_rename_index_prefix            : "("           ,   // Put before index when renaming files.
+    file_rename_index_postfix           : ")"           ,   // Put after index when renaming files.
     file_rename_one_no_index            : true          ,   // If true, Omit index when renaming only one file.
+//------------------------------------------------------------------------------------------------------------------------------
+    create_directories_fail_fast          : false         ,   // Stop creating directories immediately after one fails.
 
 //------------------------------------------------------------------------------------------------------------------------------
     log_console_output                  : true          ,   // If true, outputs all logs to the browser console
@@ -237,12 +250,49 @@ var gm_api = {
         var total = arr.length;
         var iter = 0;
         while(iter < total){
-            var ret = gm_api._request('DELETE',gm_api.apiurl,arr[iter], true, logprefix + "failed"); 
+            var params = {"type":"file", "path":arr[iter]};
+            var ret = gm_api._request('DELETE',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
             var failed = (ret === undefined || ret != 0);
             if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
             else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
             else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
             if(gm_api.file_delete_fail_fast && failed){return undefined;}
+            iter++;
+        }
+        return (total - omitted);
+    },
+    delete_directories : function(arr){ 
+        var logprefix = "delete_directories(arr): ";
+        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        var omitted = 0;
+        var total = arr.length;
+        var iter = 0;
+        while(iter < total){
+            var params = {"type":"directory", "path":arr[iter]};
+            var ret = gm_api._request('DELETE',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var failed = (ret === undefined || ret != 0);
+            if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(gm_api.file_delete_fail_fast && failed){return undefined;}
+            iter++;
+        }
+        return (total - omitted);
+    },
+    create_directories : function(arr){
+        var logprefix = "create_directories(arr): ";
+        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        var omitted = 0;
+        var total = arr.length;
+        var iter = 0;
+        while(iter < total){
+            var params = {"type":"directory", "path":arr[iter]};
+            var ret = gm_api._request('PUT',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var failed = (ret === undefined || ret != 0);
+            if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(gm_api.create_directories_fail_fast && failed){return undefined;}
             iter++;
         }
         return (total - omitted);
