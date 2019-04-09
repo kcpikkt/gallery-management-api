@@ -90,9 +90,10 @@
     }
     if($_SERVER['REQUEST_METHOD'] == 'DELETE'){     // DELETE 
         $params = json_decode($input, true);
-        $path = $params["path"] . DIRECTORY_SEPARATOR;
+        $path = $params["path"];
         $type = $params["type"];
         if($type === "directory"){
+            $path = $path.DIRECTORY_SEPARATOR;
             if(!file_exists($base.$path)){
                 echo_err(1, "$path does not exist.");
             }else if(!is_dir($base.$path)){
@@ -151,46 +152,6 @@
                 else{ echo_err(3, "renaming $original to $name failed");}
             }
         }
-    }
-
+    },
     function echo_err($code, $msg){ echo json_encode(array( "error" => $code, "err_msg" => $msg)); }
-
-// code for acquireing recursive json directory tree, don't delete, i bet it is going to be needed
-/* 
-    function add_entry_at(&$arr, $at, $index, $path ,$depth = 0){
-        global $filetypes;
-        if($depth >= sizeof($at)){return;}
-        foreach($arr as &$entry){
-            if($entry['name'] == $at[$index]){
-                add_entry_at($entry['children'],$at, $index+1,$path, $depth+1);
-                return;
-            }
-        }
-        $timestamp = filemtime($path);
-        $name = $at[$index];
-        $src = null;
-        $last = false;
-        foreach($filetypes as $filetype){
-            if(strpos($at[$index], $filetype) !== false){
-                $name = substr($at[$index], 0, -strlen($filetype));
-                $src = $path;
-                $last = true;
-                break;
-            }
-        }
-        $newentry = array('name' => $name, 'children' => array(),
-            'timestamp' => $timestamp, 'src' => $src);
-        if(!$last){
-            add_entry_at($newentry['children'], $at, $index+1,$path, $depth+1); }
-        array_push($arr, $newentry);
-        return;
-    }
-    function sort_entries_rec_cmp($a, $b){return $b['timestamp'] - $a['timestamp'];}
-    function sort_entries_rec(&$arr){
-        usort($arr, "sort_entries_rec_cmp");
-        foreach($arr as $element){ sort_entries_rec($element['children']); }
-    }
-    $max_depth = 0;
-    $list = array();
- */
 ?> 
