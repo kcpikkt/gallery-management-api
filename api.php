@@ -4,8 +4,25 @@
     $filetypes = array(".html", ".png");
     $upload_no_overwrite = true; 
     $rename_no_overwrite = false;
+    $DIR_SEP = DIRECTORY_SEPARATOR;
 
     $input = file_get_contents("php://input");
+
+    function validate_path($path){
+        global $base;
+        $newpath = $path;
+        $safeiter = 0;
+        while(realpath($newpath) === false){
+            $safeiter++;
+            $newpath = dirname($newpath).DIRECTORY_SEPARATOR;
+            if($safeiter > 100){ 
+                echo_err(100, "$path is invalid");
+            }
+        }
+        $prefix = getcwd().DIRECTORY_SEPARATOR.$base;
+        $prefix_length = strlen($prefix);
+        return ( substr(realpath($newpath).DIRECTORY_SEPARATOR, 0, $prefix_length) === $prefix );
+    }
     if($_SERVER['REQUEST_METHOD'] == 'GET'){        // GET FILES LIST
         class RecursiveFilesIterator extends RecursiveFilterIterator{
             public static $FILTERS = array('/.');
@@ -68,7 +85,6 @@
         if(!$path){
             echo_err(5,"no path parameter."); exit;
         }
-        $DIR_SEP = DIRECTORY_SEPARATOR;
         $filename = $_FILES['file']['name'];
         $newname = $_POST['newname'];
         file_put_contents('php://stderr', "$newname\n");
@@ -92,23 +108,29 @@
         $params = json_decode($input, true);
         $path = $params["path"];
         $type = $params["type"];
+        
+        // input sanitization, important 
+        if(!validate_path($base.$DIR_SEP.$path)){ echo_err(10, "$path is invalid"); }
+        if(strcmp(realpath($base.$DIR_SEP.$path), realpath(getcwd().$DIR_SEP.$base)) === 0) { 
+            echo_err(10, "$path is invalid"); } 
+
         if($type === "directory"){
-            $path = $path.DIRECTORY_SEPARATOR;
-            if(!file_exists($base.$path)){
+            $path = $path.$DIR_SEP;
+            if(!file_exists($base.$DIR_SEP.$path)){
                 echo_err(1, "$path does not exist.");
-            }else if(!is_dir($base.$path)){
+            }else if(!is_dir($base.$DIR_SEP.$path)){
                 echo_err(2, "$path is not a directory");
             }else{
                 $ret = delete_rec($base.$path);
                 if($ret){ echo_err(0, "$path deleted.");}
             }
         }else{
-            if(!file_exists($base.$path)){
+            if(!file_exists($base.$DIR_SEP.$path)){
                 echo_err(1, "$path does not exist.");
-            }else if(is_dir($base.$path)){
+            }else if(is_dir($base.$DIR_SEP.$path)){
                 echo_err(4, "$path is a directory.");
             }else{
-                $ret = unlink($base.$path);
+                $ret = unlink($base.$DIR_SEP.$path);
                 if($ret){ echo_err(0, "$path deleted.");}
                 else{ echo_err(3, "deleting $path failed");}
             }
@@ -129,8 +151,15 @@
     }
     if($_SERVER['REQUEST_METHOD'] == 'PUT'){        // RENAME , ADD DIR
         $params = json_decode($input, true);
+
         if($params["type"] == "directory"){
             $path = $params["path"];
+
+            // input sanitization, important 
+            if(!validate_path($base.$DIR_SEP.$path)){ echo_err(10, "$path is invalid"); }
+            if(strcmp(realpath($base.$DIR_SEP.$path), realpath(getcwd().$DIR_SEP.$base)) === 0) { 
+                echo_err(10, "$path is invalid"); } 
+
             if(file_exists($base.$path)){
                 echo_err(1, "$path already exists.");
             }else{
@@ -141,17 +170,24 @@
         }else{
             $name = $params["name"];
             $original = $params["path"];
+            
+            // input sanitization, important 
+            if(!validate_path($base.$DIR_SEP.$original)){ echo_err(10, "$original is invalid"); }
+            if(strcmp(realpath($base.$DIR_SEP.$original), realpath(getcwd().$DIR_SEP.$base)) === 0) { 
+                echo_err(10, realpath($base.$DIR_SEP.$original)); } 
+
             $pathinfo = pathinfo($original);
             $newname = $name . "." . $pathinfo['extension'];
-            if(!file_exists($original)){
+            if(!file_exists($base.$DIR_SEP.$original)){
                 echo_err(1, "$original does not exist.");
-            }else if(substr($original, 0, strlen($base)) !== $base){
-                echo_err(2, "invalid path, only files under $base can be edited.");
             }else{
-                if(rename($original, $newname)){ echo_err(0, "$original renamed to $newname.");}
+                $newnamepath = dirname(realpath($base.$DIR_SEP.$original)).$DIR_SEP.$newname;
+                if(rename( $base.$DIR_SEP.$original,$newnamepath ) ) { 
+                    echo_err(0, "$original renamed to $newname.");}
                 else{ echo_err(3, "renaming $original to $name failed");}
             }
         }
-    },
-    function echo_err($code, $msg){ echo json_encode(array( "error" => $code, "err_msg" => $msg)); }
+    }
+
+    function echo_err($code, $msg){ echo json_encode(array( "error" => $code, "err_msg" => $msg)); exit($code); }
 ?> 
