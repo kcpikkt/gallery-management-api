@@ -140,16 +140,15 @@ var gm_api = {
 
     init : function(){
         var ret = 1;
-        var logprefix = "init: ";
         if(!(window.File && window.FileReader && window.FileList && window.Blob)){
-            gm_api.err(logprefix+"File gm_apis are not fully supported in this browser."); ret = undefined;}
+            gm_api.err("File gm_apis are not fully supported in this browser."); ret = undefined;}
         gm_api.log_buffer = new Array(gm_api.log_buffer_size);
         if(gm_api.log_buffer === undefined || gm_api.log_buffer.length !== gm_api.log_buffer_size){
-            gm_api.err(logprefix+"Failed to create log_buffer.", true); ret = undefined;}
+            gm_api.err("Failed to create log_buffer.", true); ret = undefined;}
         if(!(gm_api.log_output_element instanceof Element) && gm_api.log_element_output){
-            gm_api.err(logprefix+"log_output_element is not an instance of Element.", true); ret = undefined;}
+            gm_api.err("log_output_element is not an instance of Element.", true); ret = undefined;}
         if(!(gm_api.file_select_preview_element instanceof Element) && gm_api.file_select_preview){
-            gm_api.err(logprefix+"file_preview_element is not an instance of Element.", true); ret = undefined;}
+            gm_api.err("file_preview_element is not an instance of Element.", true); ret = undefined;}
         return ret;
     },
 
@@ -186,31 +185,31 @@ var gm_api = {
     },
 
     get_file_list : function(){ 
-        return gm_api._request('GET',gm_api.apiurl, null, true, "get_file_list failed"); 
+        return gm_api._request('get_file_list', gm_api.apiurl, null, true); 
     },
 
     get_file_tree : function(){
-        var params = 'type=tree';
-        return gm_api._request('GET',gm_api.apiurl, params,true, "get_file_tree failed"); 
+        return gm_api._request('get_file_tree', gm_api.apiurl, null, true); 
+    },
+
+    get_base : function(){
+        return gm_api._request('get_base'     , gm_api.apiurl, null, true); 
     },
 
     upload_selected_files(path){ // TODO: async
-        var logprefix = "upload_selected_files(path): ";
         var omitted = 0;
         var total = gm_api.file_select_buffer.length;
-        if(path === undefined){ gm_api.err(logprefix+"path is not specified."); return undefined; } 
+        if(path === undefined){ gm_api.err("path is not specified."); return undefined; } 
         while(gm_api.file_select_buffer.length > omitted){
             var form_data = new FormData();
             form_data.append('file', gm_api.file_select_buffer[omitted]);
             form_data.append('path', path);
             form_data.append('newname', gm_api.file_select_buffer[omitted].newname);
-            form_data.append('newname', gm_api.file_select_buffer[omitted].newname);
-            var ret = gm_api._request
-                ('POST',gm_api.apiurl,form_data, true,
-                    logprefix + "uploading " + gm_api.file_select_buffer[omitted].name + " failed"); 
+
+            var ret = gm_api._request('upload_file',gm_api.apiurl,form_data, true); 
             var failed = (ret === undefined || ret.error != 0);
             var repeat = false;
-            if(ret === undefined){ gm_api.err( logprefix + "uploading "+ gm_api.file_select_buffer[omitted].name +" failed"); }
+            if(ret === undefined){ gm_api.err( "uploading "+ gm_api.file_select_buffer[omitted].name +" failed"); }
             else if(ret.error != 0){ 
                 if(ret.error == 3){
                     var file = gm_api.file_select_buffer[omitted];
@@ -238,31 +237,30 @@ var gm_api = {
                     failed = false;
                     gm_api.file_select_buffer[omitted].newname = name;
                 }else{
-                    gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
+                    gm_api.err( "SERVER: "+ ret.err_msg); }
                 }
-            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log("SERVER: "+ ret.err_msg); }
             if(gm_api.file_upload_fail_fast && failed){return undefined;}
             if(gm_api.file_upload_persist_failed && failed){ omitted+=1; continue;}
             if(!repeat){ gm_api.file_select_buffer.splice(omitted, 1); }
             if(gm_api.file_select_preview){ gm_api.update_file_select_preview();}
         }
-        gm_api.log(logprefix+"uploaded " + (total-omitted) + " of " + total)
+        gm_api.log("uploaded " + (total-omitted) + " of " + total)
         return (total - omitted);
     },
 
     delete_files : function(arr){ 
-        var logprefix = "delete_files(arr): ";
-        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err("arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
         while(iter < total){
-            var params = {"type":"file", "path":arr[iter]};
-            var ret = gm_api._request('DELETE',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var params = {"path":arr[iter]};
+            var ret = gm_api._request('delete_file',gm_api.apiurl, params, true); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(ret === undefined){ gm_api.err( "deleting "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log("SERVER: "+ ret.err_msg); }
             if(gm_api.file_delete_fail_fast && failed){return undefined;}
             iter++;
         }
@@ -270,18 +268,17 @@ var gm_api = {
     },
 
     delete_directories : function(arr){ 
-        var logprefix = "delete_directories(arr): ";
-        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err("arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
         while(iter < total){
             var params = {"type":"directory", "path":arr[iter]};
-            var ret = gm_api._request('DELETE',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var ret = gm_api._request('delete_directory',gm_api.apiurl,params, true); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ gm_api.err( logprefix + "deleting "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(ret === undefined){ gm_api.err( "deleting "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log("SERVER: "+ ret.err_msg); }
             if(gm_api.file_delete_fail_fast && failed){return undefined;}
             iter++;
         }
@@ -289,18 +286,17 @@ var gm_api = {
     },
 
     create_directories : function(arr){
-        var logprefix = "create_directories(arr): ";
-        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err("arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
         while(iter < total){
             var params = {"type":"directory", "path":arr[iter]};
-            var ret = gm_api._request('PUT',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var ret = gm_api._request('create_directory',gm_api.apiurl,params, true); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ gm_api.err( logprefix + "creating "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(ret === undefined){ gm_api.err( "creating "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log("SERVER: "+ ret.err_msg); }
             if(gm_api.create_directories_fail_fast && failed){return undefined;}
             iter++;
         }
@@ -308,8 +304,7 @@ var gm_api = {
     },
 
     rename_files : function(arr, name){
-        var logprefix = "rename_files(arr,name): ";
-        if(!Array.isArray(arr)){ gm_api.err(logprefix+ "arr is not an array."); return undefined;}
+        if(!Array.isArray(arr)){ gm_api.err("arr is not an array."); return undefined;}
         var omitted = 0;
         var total = arr.length;
         var iter = 0;
@@ -317,23 +312,22 @@ var gm_api = {
             var params = {"name":name + gm_api.file_rename_index_prefix + 
                 iter + gm_api.file_rename_index_postfix, "path":arr[iter] }
             if(arr.length == 1 && gm_api.file_rename_one_no_index){params.name = name;}
-            var ret = gm_api._request('PUT',gm_api.apiurl,JSON.stringify(params), true, logprefix + "failed"); 
+            var ret = gm_api._request('reaname_file',gm_api.apiurl,params, true); 
             var failed = (ret === undefined || ret != 0);
-            if(ret === undefined){ gm_api.err( logprefix + "renaming "+ arr[iter] +" failed"); }
-            else if(ret.error != 0){ gm_api.err( logprefix + "SERVER: "+ ret.err_msg); }
-            else{ gm_api.log(logprefix + "SERVER: "+ ret.err_msg); }
+            if(ret === undefined){ gm_api.err( "renaming "+ arr[iter] +" failed"); }
+            else if(ret.error != 0){ gm_api.err( "SERVER: "+ ret.err_msg); }
+            else{ gm_api.log("SERVER: "+ ret.err_msg); }
             if(gm_api.file_rename_fail_fast && failed){return undefined;}
             iter++;
         }
         return (total - omitted);
     },
 
-    _request : function
-        (method, url, params, json_output=false, err_message="request error"){
+    _request : function (method, url, params, json_output=false){
         var ret;
-        if(method === 'GET'){ url += "?" + params;}
+        var pass = {'method' : method, 'params' : params };
         var xhr = new XMLHttpRequest();
-        xhr.open(method, url, false);
+        xhr.open('POST', url, false);
         xhr.onreadystatechange = function() {
             if(xhr.readyState === 4){
                 if(xhr.status === 200 || xhr.status == 0){
@@ -341,13 +335,13 @@ var gm_api = {
                 }
             }
         }
-        xhr.send(params);
-        if(ret === undefined){ gm_api.err(err_message); return undefined;}
+        xhr.send(JSON.stringify(pass));
+        if(ret === undefined){ 
+            gm_api.err(gm_api._request.caller.name + "failed."); return undefined;}
         else{ return (json_output) ? JSON.parse(ret) : ret; }
     },
 
     log_output : function(){
-        var logprefix = "log_output: ";
         if(gm_api.log_output_element instanceof Element){
             gm_api.log_output_element.innerHTML = "";
             for(    let i=gm_api.log_buffer_iter;
@@ -358,13 +352,14 @@ var gm_api = {
                 }
             }
         }else{ 
-            gm_api.err(logprefix + "log_output_element is not an instance of Element.", true);
+            gm_api.err("log_output_element is not an instance of Element.", true);
             gm_api.log()
         }
     },
 
     log : function(info, force_console = false){
-        var msg = "[" + new Date().toLocaleString() + "] " + info;
+        caller = this.log.caller.name;
+        var msg = "[" + new Date().toLocaleString() + "] " + caller + ": " + info;
         gm_api.log_buffer[gm_api.log_buffer_iter++] = msg + gm_api.log_buffer_endline;
         gm_api.log_buffer_iter %= gm_api.log_buffer_size;
         if(force_console || gm_api.log_console_output){ console.log(msg); }
