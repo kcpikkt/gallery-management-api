@@ -19,10 +19,10 @@
       i.e. you should first set global variables, connect DOM elements and such
       and then call gm_api.init() once. Force all of its log output onto the console.
 
-      returns 1 if everything went well or undefined if failed.
+      returns 0 if everything went well
 
 --------------------------------------------------------------------------------------------------------------------------------
-   get_file_tree ()
+   get_file_tree (path)
       returns tree of all files under $base directory as JSON array.
               File is represented by simple JSON object with name and array of its children:
               { "name":"filename" , "children":[...] }
@@ -139,16 +139,16 @@ var gm_api = {
     file_select_buffer : new Array(),
 
     init : function(){
-        var ret = 1;
+        var ret = 0;
         if(!(window.File && window.FileReader && window.FileList && window.Blob)){
-            gm_api.err("File gm_apis are not fully supported in this browser."); ret = undefined;}
+            gm_api.err("File gm_apis are not fully supported in this browser."); ret = 1;}
         gm_api.log_buffer = new Array(gm_api.log_buffer_size);
         if(gm_api.log_buffer === undefined || gm_api.log_buffer.length !== gm_api.log_buffer_size){
-            gm_api.err("Failed to create log_buffer.", true); ret = undefined;}
+            gm_api.err("Failed to create log_buffer.", true); ret = 2;}
         if(!(gm_api.log_output_element instanceof Element) && gm_api.log_element_output){
-            gm_api.err("log_output_element is not an instance of Element.", true); ret = undefined;}
+            gm_api.err("log_output_element is not an instance of Element.", true); ret = 3;}
         if(!(gm_api.file_select_preview_element instanceof Element) && gm_api.file_select_preview){
-            gm_api.err("file_preview_element is not an instance of Element.", true); ret = undefined;}
+            gm_api.err("file_preview_element is not an instance of Element.", true); ret = 4;}
         return ret;
     },
 
@@ -188,8 +188,9 @@ var gm_api = {
         return gm_api._request('get_file_list', gm_api.apiurl, null, true); 
     },
 
-    get_file_tree : function(){
-        return gm_api._request('get_file_tree', gm_api.apiurl, null, true); 
+    get_file_tree : function(path = "/"){
+        var params = { "path" : path };
+        return gm_api._request('get_file_tree', gm_api.apiurl, params, true); 
     },
 
     get_base : function(){
@@ -273,7 +274,7 @@ var gm_api = {
         var total = arr.length;
         var iter = 0;
         while(iter < total){
-            var params = {"type":"directory", "path":arr[iter]};
+            var params = { "path":arr[iter] };
             var ret = gm_api._request('delete_directory',gm_api.apiurl,params, true); 
             var failed = (ret === undefined || ret != 0);
             if(ret === undefined){ gm_api.err( "deleting "+ arr[iter] +" failed"); }

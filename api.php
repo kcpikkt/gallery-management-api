@@ -1,5 +1,6 @@
 <?php
     session_start();
+    $msg = "";
     $base = "contents/";
     $upload_no_overwrite = true; 
     $rename_no_overwrite = false;
@@ -9,7 +10,7 @@
     $input = json_decode($input_raw, true);
 
     if($_SERVER['REQUEST_METHOD'] == 'POST'){
-        $params = json_decode($input['params'], true);
+        $params = $input['params'];
         $method = $input['method'];
 
         switch($method){
@@ -44,18 +45,18 @@
 
     function validate_path($path){
         global $base;
-        $newpath = $path;
+        global $DS;
+        $testpath = $path;
         $safeiter = 0;
-        while(realpath($newpath) === false){
+        while(realpath($testpath) === false){
             $safeiter++;
-            $newpath = dirname($newpath).DIRECTORY_SEPARATOR;
+            $testpath = dirname($testpath).$DS;
             if($safeiter > 100){ 
                 echo_err(100, "$path is invalid");
             }
         }
-        $prefix = getcwd().DIRECTORY_SEPARATOR.$base;
-        $prefix_length = strlen($prefix);
-        return ( substr(realpath($newpath).DIRECTORY_SEPARATOR, 0, $prefix_length) === $prefix );
+        $prefix = realpath(getcwd().$DS.$base.$DS);
+        return ( substr(realpath($testpath) , 0, strlen($prefix)) === $prefix );
     }
 
     class RecursiveFilesIterator extends RecursiveFilterIterator{
@@ -67,9 +68,15 @@
             return true;
         }
     }
-
-    function get_file_tree(){
+    function _return($ret, $code = 0){
+        global $msg;
+        $ret['code'] = $code;
+        $ret['msg']  = $msg;
+        echo json_encode($ret);
+    }
+    function get_file_tree($params){
         function add_entry_at(&$arr, $at, $index,$path,$depth = 0){
+            global $base;
             global $filetypes;
             if($depth >= sizeof($at)){return;}
             foreach($arr as &$entry){
@@ -80,7 +87,16 @@
             }
             $timestamp = filemtime($path);
             $name = $at[$index];
-            $newentry = array('name' => $name, 'children' => array(), 'is_directory' => is_dir($path));
+            if(substr($path, 0, strlen($base)) == $base){
+                $newpath = substr($path, strlen($base));
+            }
+            $newentry = array(
+                'name' => $name, 
+                'path' => $newpath,
+                'depth' => $index + 1,
+                'children' => array(), 
+                'is_directory' => is_dir($path)
+            );
             add_entry_at($newentry['children'], $at, $index+1,$path, $depth+1);
             array_push($arr, $newentry);
             return;
@@ -92,20 +108,47 @@
             foreach($arr as $element){ sort_entries_rec($element['children']); }
         }
         global $base;
-        $max_depth = 0;
-        $dir = new RecursiveDirectoryIterator($base);
+        global $DS;
+        $path = $params['path'];
+        $path = empty($path) ? "/" : $path;
+        error_log($path);
+
+        // input sanitization, important 
+        if(!validate_path($base.$DS.$path))
+            echo_err(10, "$path is invalid"); 
+        if(!file_exists($base.$DS.$path))
+            echo_err(1, "$path does not exist.");
+        else if(!is_dir($base.$DS.$path))
+            echo_err(2, "$path is not a directory");
+
+        $dir = new RecursiveDirectoryIterator($base.$DS.$path);
         $files = new RecursiveIteratorIterator(
             new RecursiveFilesIterator($dir),
             RecursiveIteratorIterator::SELF_FIRST);
-        $list = array();
-        $filetree = array(array("name"=>"root","children"=>array()));
-        foreach($files as $path => $file){
-            $del_files = array_filter(
-                explode(DIRECTORY_SEPARATOR, substr($path, strlen($base))),'strlen');
-            $max_depth = max($max_depth, sizeof($del_files));
-            add_entry_at($filetree[0]['children'], $del_files, 0,$path, 0);
+
+        $rootnode = array(
+            'name' => ($path == "/" ? "root" : basename($path)), 
+            'path' => $path,
+            'depth' => 0,
+            'children' => array(), 
+            'is_directory' => true
+        );
+        
+        foreach($files as $filepath => $file){
+            error_log(substr($filepath, strlen($base)) );
+            $delimited_path = 
+                array_values ( array_filter( 
+                        explode($DS, substr($filepath, strlen($base))) ,'strlen')) ;
+            $depth = max($depth, sizeof($delimited_path));
+
+            add_entry_at($rootnode['children'], $delimited_path, 0,$filepath, 0);
         }
-        echo json_encode($filetree);
+        $ret = array(
+            'tree' => $rootnode,
+            'depth' => $depth
+        );
+        
+        _return($ret);
     }
 
     function get_file_list($params){
@@ -190,7 +233,6 @@
         global $DS;
 
         $path = $params["path"];
-
         // input sanitization, important 
         if(!validate_path($base.$DS.$path)){ echo_err(10, "$path is invalid"); }
         if(strcmp(realpath($base.$DS.$path), realpath(getcwd().$DS.$base)) === 0) { 
