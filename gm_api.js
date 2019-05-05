@@ -34,6 +34,9 @@
               as JSON array or undefined if failed ($base is defined in api.php).
 
 --------------------------------------------------------------------------------------------------------------------------------
+    set_file_metadata ( path, metadata )
+
+--------------------------------------------------------------------------------------------------------------------------------
    delete_files ( arr )
       takes JSON array of paths to files - 'arr' and deletes them from the server.
 
@@ -185,7 +188,7 @@ var gm_api = {
     },
 
     get_file_list : function(){ 
-        return gm_api._request('get_file_list', gm_api.apiurl, null, true); 
+        return gm_api.erequest('get_file_list', gm_api.apiurl, null, true); 
     },
 
     get_file_tree : function(path = "/"){
@@ -203,6 +206,7 @@ var gm_api = {
         if(path === undefined){ gm_api.err("path is not specified."); return undefined; } 
         while(gm_api.file_select_buffer.length > omitted){
             var form_data = new FormData();
+            form_data.append('method', 'upload_file');
             form_data.append('file', gm_api.file_select_buffer[omitted]);
             form_data.append('path', path);
             form_data.append('newname', gm_api.file_select_buffer[omitted].newname);
@@ -217,7 +221,6 @@ var gm_api = {
                     var name = (file.newname === undefined ? file.name : file.newname);
                     var ext = name.substring(name.lastIndexOf("."));
                     var name = name.slice(0, -(ext.length));
-            console.log(name);
                     var regex = new RegExp
                         ( gm_api.file_rename_index_prefix + "[0-9]+" + gm_api.file_rename_index_postfix, "gm")
                     index = name.match(regex);
@@ -249,7 +252,14 @@ var gm_api = {
         gm_api.log("uploaded " + (total-omitted) + " of " + total)
         return (total - omitted);
     },
-
+    edit_file_metadata : function(path, metadata){
+        var params = { "path" : path, "meta" : metadata };
+        return gm_api._request("set_file_metadata" , gm_api.apiurl, params, true); 
+    },
+    set_file_metadata : function(path, metadata){
+        var params = { "path" : path, "meta" : metadata };
+        return gm_api._request("edit_file_metadata" , gm_api.apiurl, params, true); 
+    },
     delete_files : function(arr){ 
         if(!Array.isArray(arr)){ gm_api.err("arr is not an array."); return undefined;}
         var omitted = 0;
@@ -325,8 +335,10 @@ var gm_api = {
     },
 
     _request : function (method, url, params, json_output=false){
+        //TOFIX:
+        if(params instanceof FormData) var pass = params;
+        else var pass = JSON.stringify({'method' : method, 'params' : params });
         var ret;
-        var pass = {'method' : method, 'params' : params };
         var xhr = new XMLHttpRequest();
         xhr.open('POST', url, false);
         xhr.onreadystatechange = function() {
@@ -336,7 +348,7 @@ var gm_api = {
                 }
             }
         }
-        xhr.send(JSON.stringify(pass));
+        xhr.send(pass);
         if(ret === undefined){ 
             gm_api.err(gm_api._request.caller.name + "failed."); return undefined;}
         else{ return (json_output) ? JSON.parse(ret) : ret; }

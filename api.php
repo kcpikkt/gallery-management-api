@@ -5,13 +5,24 @@
     $upload_no_overwrite = true; 
     $rename_no_overwrite = false;
     $DS = DIRECTORY_SEPARATOR;
+    $metadata_max_size = 1024;
 
     $input_raw = file_get_contents("php://input");
     $input = json_decode($input_raw, true);
 
+
     if($_SERVER['REQUEST_METHOD'] == 'POST'){
         $params = $input['params'];
         $method = $input['method'];
+        
+        error_log(json_encode($params));
+        error_log(json_encode($_POST));
+        //FIXME
+        if($params === NULL){
+            $params = $_POST;
+            if(isset($params['method']))
+                $method = $params['method'];
+        }
 
         switch($method){
             case "get_file_tree":
@@ -38,6 +49,13 @@
             case "get_base":
                 get_base        ($params);
                 break;
+            case "set_file_metadata":
+                edit_file_metadata($params, true);
+                break;
+            case "edit_file_metadata":
+                edit_file_metadata($params, false);
+                break;
+
             default:
                 break;
         }
@@ -167,11 +185,49 @@
         echo json_encode( array( 'base' => $base ) );
         exit(0);
     }
+    function edit_file_metadata($params, $overwrite = false){
+        global $base;
+        global $DS;
+        global $metadata_max_size;
+        $path = $params["path"];
+        $meta = $params["meta"];
+        // input sanitization, important 
+        if(!validate_path($base.$DS.$path)){ echo_err(10, "$path is invalid"); }
+        if(strcmp(realpath($base.$DS.$path), realpath(getcwd().$DS.$base)) === 0) { 
+            echo_err(10, "$path is invalid"); } 
 
+        if(!file_exists($base.$DS.$path)){
+            echo_err(1, "$path does not exist.");
+        }else if(gettype($meta) != "array"){
+            echo_err(2, "metadata is invalid");
+        }else{
+            $metafilename = ".".basename($path).".meta";
+            $metafilepath = realpath($base).$DS.dirname($path).$DS.$metafilename;
+
+            if(!file_exists($metafilepath))
+                $metafile = fopen($metafilepath, "x+");
+            else
+                $metafile = fopen($metafilepath, "r+");
+
+            $metadata_json = fread($metafile, $metadata_max_size);
+            $metadata = json_decode($metadata_json, true);
+            fclose($metafile);
+
+            error_log(true);
+            if(gettype($metadata) != "array" ) $metadata = array();
+
+            foreach($meta as $key => $value) $metadata[$key] = $value;
+
+            error_log(json_encode($metadata));
+            $metadata_json = json_encode($metadata);
+            file_put_contents($metafilepath, $metadata_json);
+        }
+        echo_err(0, $metadata_json);
+    }
     function upload_file($params){
         global $base;
         global $DS;
-        $path = $params["path"];
+        $path = $_POST["path"];
         if(!$path){
             echo_err(5,"no path parameter."); exit;
         }
